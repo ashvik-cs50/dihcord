@@ -1,0 +1,7 @@
+*.js text linguist-language=JavaScript
+*.ts text linguist-language=TypeScript
+*.tsx text linguist-language=TypeScript
+*.css text linguist-language=CSS
+*.html text linguist-language=HTML
+*.json text linguist-language=JSON
+*.svg image/svg+xml
