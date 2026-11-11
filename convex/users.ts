@@ -147,7 +147,7 @@ export const clearAvatar = mutation({
 });
 
 export const getAvatarUrl = async (
-  ctx: { storage: { getUrl: (id: any) => Promise<string | null> } },
+  ctx: { storage: { getUrl: (id: string) => Promise<string | null> } },
   user: Doc<"users">,
 ): Promise<string | null> => {
   if (!user.avatarStorageId) return null;

@@ -18,7 +18,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      '@convex/_generated': path.resolve(dirname, '../convex/_generated'),
+      '@convex/_generated': path.resolve(dirname, 'convex/_generated'),
       '@': path.resolve(dirname, 'src'),
     },
   },

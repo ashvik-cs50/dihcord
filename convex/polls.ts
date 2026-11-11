@@ -1,7 +1,6 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 import { validateTokenWrite, validateTokenRead, requireChannelAccess, tokenField } from "./helpers";
-import type { Id } from "./_generated/dataModel";
 
 export const createPoll = mutation({
   args: {

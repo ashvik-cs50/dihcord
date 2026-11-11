@@ -1,7 +1,6 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 import { requireMember, canModerate, validateTokenWrite, validateTokenRead, tokenField } from "./helpers";
-import type { Id } from "./_generated/dataModel";
 
 const MAX_STICKER_SIZE = 512 * 1024;
 

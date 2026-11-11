@@ -246,7 +246,7 @@ export const search = query({
     await validateTokenRead(ctx.db, args.token);
     const q = args.query.trim();
     if (q.length < 2) return [];
-    let searchBuilder = ctx.db
+    const searchBuilder = ctx.db
       .query("messages")
       .withSearchIndex("search", (s) => {
         let fb = s.search("content", q);

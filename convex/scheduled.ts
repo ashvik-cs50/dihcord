@@ -1,8 +1,6 @@
 import { v } from "convex/values";
 import { query, mutation, internalMutation, internalQuery } from "./_generated/server";
-import { internal } from "./_generated/api";
 import { validateTokenWrite, validateTokenRead, requireChannelAccess, tokenField } from "./helpers";
-import type { Id } from "./_generated/dataModel";
 
 export const scheduleMessage = mutation({
   args: {
