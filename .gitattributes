@@ -4,4 +4,4 @@
 *.css text linguist-language=CSS
 *.html text linguist-language=HTML
 *.json text linguist-language=JSON
-*.svg image/svg+xml
+*.svg binary
