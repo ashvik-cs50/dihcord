@@ -10,6 +10,10 @@ import {
   Eye as EyeIcon,
   Lock as LockIcon,
   MoreHorizontal as MoreIcon,
+  Palette,
+  Image,
+  RotateCw,
+  Star,
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
@@ -77,7 +81,7 @@ export function SettingsContent() {
               variant="danger"
               className="w-full text-xs"
               onClick={() => {
-                if (token) void logout({ token }).catch(() => {});
+                if (token) void logout().catch(() => {});
                 closeModal();
               }}
             >
@@ -107,12 +111,6 @@ export function SettingsContent() {
               />}
               {section === "appearance" && <ThemePicker />}
               {section === "customization" && <CustomizationStudio />}
-              {section === "accessibility" && <AccessibilitySection
-                compactMode={compactMode}
-                setCompactMode={setCompactMode}
-                reducedMotion={reducedMotion}
-                setReducedMotion={setReducedMotion}
-              />}
               {section === "notifications" && <NotificationsSection unreadNotifications={unreadNotifications} />}
               {section === "privacy" && <PrivacySection />}
               {section === "voice" && <VoiceSection />}

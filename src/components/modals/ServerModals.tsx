@@ -488,7 +488,7 @@ export function ServerSettingsModal({
   server: ServerDetail | undefined;
 }) {
   const { token, me } = useAuth();
-  const { modal, closeModal, pushToast } = useUI();
+  const { modal, closeModal, pushToast, openModal } = useUI();
   const update = useMutation(api.servers.update);
   const regenerate = useMutation(api.servers.regenerateInvite);
   const remove = useMutation(api.servers.remove);

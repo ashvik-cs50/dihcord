@@ -4,20 +4,17 @@
 
 # Dependencies
 node_modules/
-dihcord/node_modules/
 
 # Build outputs
 dist/
-dihcord/dist/
-dihcord/.vite/
-
-# Convex generated code
-convex/_generated/
+.vite/
 
 # OS
 .DS_Store
 *.swp
-*~# Logs
+*~
+
+# Logs
 logs
 *.log
 npm-debug.log*
@@ -26,16 +23,10 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
-
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
 .idea
-.DS_Store
 *.suo
 *.ntvs*
 *.njsproj

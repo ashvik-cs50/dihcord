@@ -1,15 +1,33 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import type {
+  ButtonHTMLAttributes,
+  ReactNode,
+} from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger" | "outline";
+
+type ButtonProps = Omit<
+  ButtonHTMLAttributes<HTMLButtonElement>,
+  | "onAnimationStart"
+  | "onAnimationEnd"
+  | "onAnimationIteration"
+  | "onDragStart"
+  | "onDragEnd"
+  | "onDragEnter"
+  | "onDragLeave"
+  | "onDragOver"
+  | "onDrag"
+> & {
+  variant?: Variant;
+};
 
 export function Button({
   variant = "primary",
   className,
   children,
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant }) {
+}: ButtonProps) {
   return (
     <motion.button
       whileHover={{ scale: 1.02 }}

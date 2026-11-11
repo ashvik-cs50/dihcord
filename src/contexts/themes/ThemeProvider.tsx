@@ -97,7 +97,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const existingBg = document.getElementById("dihcord-animated-bg");
     if (existingBg) existingBg.remove();
 
-    if (theme.animation?.bgType !== "none") {
+    if (theme.animation?.bgType !== "none" && theme.animation) {
       const bg = document.createElement("div");
       bg.id = "dihcord-animated-bg";
       bg.className = "animated-bg";
