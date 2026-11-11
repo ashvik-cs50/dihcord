@@ -1,0 +1,20 @@
+# Environment
+.env.local
+.env
+
+# Dependencies
+node_modules/
+dihcord/node_modules/
+
+# Build outputs
+dist/
+dihcord/dist/
+dihcord/.vite/
+
+# Convex generated code
+convex/_generated/
+
+# OS
+.DS_Store
+*.swp
+*~
