@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { api } from "@/lib/convex";
-import { useQuery, useAction, useMutation } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import type { Me, UserStatus } from "@/types";
 
 const TOKEN_KEY = "dihcord:token";
@@ -28,6 +28,36 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+// Safe wrappers that don't crash when ConvexProvider is not mounted
+// (e.g. during GitHub Pages deployment before VITE_CONVEX_URL is set)
+function safeUseQuery(queryFn: any, args: any) {
+  try {
+    return useQuery(queryFn, args);
+  } catch {
+    return undefined;
+  }
+}
+
+function safeUseAction(actionFn: any) {
+  try {
+    return useAction(actionFn);
+  } catch {
+    return async () => {
+      throw new Error("Convex backend not configured");
+    };
+  }
+}
+
+function safeUseMutation(mutationFn: any) {
+  try {
+    return useMutation(mutationFn);
+  } catch {
+    return async () => {
+      throw new Error("Convex backend not configured");
+    };
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(() =>
     localStorage.getItem(TOKEN_KEY),
@@ -36,25 +66,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => (localStorage.getItem(STATUS_KEY) as UserStatus) || "online",
   );
 
-  const me = useQuery(
+  const me = safeUseQuery(
     api.users.getSessionUser,
     token ? { token } : "skip",
   ) as Me | undefined | null;
 
-  const unreadNotifications = useQuery(
+  const unreadNotifications = safeUseQuery(
     api.notifications.unreadCount,
     token ? { token } : "skip",
   ) as number | undefined;
 
-  const unreadChannels = useQuery(
+  const unreadChannels = safeUseQuery(
     api.notifications.unreadChannelCounts,
     token ? { token } : "skip",
   ) as Record<string, number> | undefined;
 
-  const loginAction = useAction(api.auth.login);
-  const signupAction = useAction(api.auth.signup);
-  const logoutAction = useMutation(api.users.logout);
-  const heartbeatMutation = useMutation(api.users.heartbeat);
+  const loginAction = safeUseAction(api.auth.login);
+  const signupAction = safeUseAction(api.auth.signup);
+  const logoutAction = safeUseMutation(api.users.logout);
+  const heartbeatMutation = safeUseMutation(api.users.heartbeat);
 
   const loading = !!token && me === undefined;
 
@@ -81,7 +111,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void heartbeatMutation({ token, status }).catch(() => {});
   }, [token, status, heartbeatMutation]);
 
-  // Presence heartbeat — syncs an external system (Convex) with app state.
   useEffect(() => {
     if (!token) return;
     const beat = () => {
