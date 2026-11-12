@@ -45,16 +45,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           echo "Checking for existing github-pages artifacts in run $GITHUB_RUN_ID..."
-          existing=$(gh api repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts \
-            --paginate --jq '.artifacts[] | select(.name == "github-pages") | .id')
-          if [ -n "$existing" ]; then
-            echo "$existing" | while read -r id; do
-              gh api repos/$GITHUB_REPOSITORY/actions/artifacts/$id -X DELETE
-              echo "Deleted artifact $id"
-            done
-          else
-            echo "No existing github-pages artifacts found in this run."
-          fi
+          gh api repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts \
+            --paginate -H "Accept: application/vnd.github+json" \
+            | jq -r '.artifacts[] | select(.name == "github-pages") | .id' \
+            | while read -r id; do
+                if [ -n "$id" ]; then
+                  gh api repos/$GITHUB_REPOSITORY/actions/artifacts/$id -X DELETE
+                  echo "Deleted artifact $id"
+                fi
+              done
+          echo "Cleanup step complete."
+
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v4
