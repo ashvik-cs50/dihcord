@@ -9,7 +9,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { UIProvider } from "@/contexts/UIContext";
 import { ThemeProvider } from "@/contexts/themes/ThemeProvider";
 
-export function AppWithProviders() {
+export default function AppWithProviders() {
   return (
     <AuthProvider>
       <ThemeProvider>
