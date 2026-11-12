@@ -20,21 +20,6 @@ type ButtonProps = Omit<
   | "onDrag"
 > & {
   variant?: Variant;
-};
-
-type ButtonProps = Omit<
-  ButtonHTMLAttributes<HTMLButtonElement>,
-  | "onAnimationStart"
-  | "onAnimationEnd"
-  | "onAnimationIteration"
-  | "onDragStart"
-  | "onDragEnd"
-  | "onDragEnter"
-  | "onDragLeave"
-  | "onDragOver"
-  | "onDrag"
-> & {
-  variant?: Variant;
   loading?: boolean;
 };
 
