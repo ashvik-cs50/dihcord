@@ -9,6 +9,7 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  actions: write
 
 concurrency:
   group: "pages"
@@ -20,6 +21,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -36,8 +40,33 @@ jobs:
           VITE_CONVEX_URL: ${{ secrets.VITE_CONVEX_URL }}
         run: npm run build
 
+      - name: Remove any existing Pages artifacts from this run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          GH_RUN_ID: ${{ github.run_id }}
+          API_HOST: ${{ github.api_url }}
+        run: |
+          artifact_ids=$(curl -s -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
+            "$API_HOST/repos/$GH_REPO/actions/runs/$GH_RUN_ID/artifacts" \
+            --jq '.artifacts[] | select(.name == "github-pages") | .id')
+          if [ -n "$artifact_ids" ]; then
+            echo "$artifact_ids" | while read -r artifact_id; do
+              curl -s -X DELETE \
+                -H "Authorization: Bearer $GH_TOKEN" \
+                -H "Accept: application/vnd.github+json" \
+                -H "X-GitHub-Api-Version: 2026-03-10" \
+                "$API_HOST/repos/$GH_REPO/actions/artifacts/$artifact_id"
+              echo "Deleted artifact $artifact_id"
+            done
+          else
+            echo "No existing github-pages artifacts found in this run."
+          fi
+
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
           path: dist
 
