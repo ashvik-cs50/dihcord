@@ -18,6 +18,7 @@ export const listServerEmojis = query({
         name: e.name,
         url: await ctx.storage.getUrl(e.imageStorageId),
         creatorId: e.creatorId,
+        animated: e.animated,
         createdAt: e.createdAt,
       })),
     );
@@ -30,6 +31,7 @@ export const uploadEmoji = mutation({
     serverId: v.id("servers"),
     name: v.string(),
     imageStorageId: v.id("_storage"),
+    animated: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const user = await validateTokenWrite(ctx.db, args.token);
@@ -55,11 +57,14 @@ export const uploadEmoji = mutation({
       await ctx.storage.delete(args.imageStorageId);
       throw new Error("Emoji must be under 256 KB");
     }
+    const animated =
+      !!args.animated || /gif/.test(metadata.contentType ?? "");
     return await ctx.db.insert("serverEmojis", {
       serverId: args.serverId,
       name,
       imageStorageId: args.imageStorageId,
       creatorId: user._id,
+      animated,
       createdAt: Date.now(),
     });
   },

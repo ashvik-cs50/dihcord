@@ -13,6 +13,7 @@ export function Avatar({
   name,
   id,
   url,
+  avatarKey,
   size = "md",
   status,
   lastSeenAt,
@@ -22,6 +23,7 @@ export function Avatar({
   name: string;
   id: string;
   url?: string | null;
+  avatarKey?: string;
   size?: keyof typeof SIZES | number;
   status?: UserStatus;
   lastSeenAt?: number;
@@ -32,14 +34,15 @@ export function Avatar({
   const online = status && lastSeenAt !== undefined
     ? isOnline(status, lastSeenAt)
     : status ? status !== "offline" && status !== "invisible" : true;
+  const src = url ?? (avatarKey ? `/avatars/${avatarKey}` : undefined);
   return (
     <div
       className={cn("relative shrink-0 select-none", className)}
       style={{ width: px, height: px }}
     >
-      {url ? (
+      {src ? (
         <img
-          src={url}
+          src={src}
           alt={name}
           className="h-full w-full rounded-full object-cover"
           loading="lazy"

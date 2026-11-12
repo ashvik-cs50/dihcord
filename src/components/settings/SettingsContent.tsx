@@ -41,7 +41,7 @@ const SETTINGS_SECTIONS: { id: string; label: string; icon: React.ElementType }[
 ];
 
 export function SettingsContent() {
-  const { modal, closeModal } = useUI();
+  const { modal, closeModal, openModal } = useUI();
   const { me, token, logout, unreadNotifications } = useAuth();
   const [section, setSection] = useState("account");
   const [displayName, setDisplayName] = useState(me?.displayName ?? "");
@@ -109,7 +109,26 @@ export function SettingsContent() {
                 setCustomStatus={setCustomStatus}
                 me={me}
               />}
-              {section === "appearance" && <ThemePicker />}
+              {section === "appearance" && (
+                <div className="space-y-6">
+                  <ThemePicker />
+                  <div className="rounded-lg border border-line bg-bg-2 p-5">
+                    <h2 className="text-lg font-semibold text-text mb-1">Theme editor</h2>
+                    <p className="text-sm text-text-dim mb-4">
+                      Create and save custom themes with the live editor. Themes
+                      are saved to your account and sync across devices.
+                    </p>
+                    <div className="flex gap-3">
+                      <Button onClick={() => openModal("themeEditor")}>
+                        Open theme editor
+                      </Button>
+                      <Button variant="secondary" onClick={() => setSection("customization")}>
+                        Customization studio
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
               {section === "customization" && <CustomizationStudio />}
               {section === "notifications" && <NotificationsSection unreadNotifications={unreadNotifications} />}
               {section === "privacy" && <PrivacySection />}

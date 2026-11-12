@@ -10,10 +10,17 @@ import {
   ChevronRight,
   Users,
   Mic,
+  Trash2,
+  Eye,
+  EyeOff,
+  MoreHorizontal,
 } from "lucide-react";
+import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUI } from "@/contexts/UIContext";
 import { UserPanel } from "./UserPanel";
+import { ContextMenu } from "@/components/ui/ContextMenu";
 import { cn } from "@/lib/utils";
 import type { Channel, ServerDetail } from "@/types";
 
@@ -24,13 +31,108 @@ export function ChannelSidebar({
   channels: Channel[] | undefined;
   server: ServerDetail | undefined;
 }) {
-  const { unreadChannels } = useAuth();
+  const { token, unreadChannels } = useAuth();
   const { openModal, pushToast } = useUI();
   const navigate = useNavigate();
   const { channelId: activeChannelId } = useParams();
 
   const canModerate =
     !!server && (server.myRole === "owner" || server.myRole === "admin");
+
+  const hiddenChannels = useQuery(
+    api.channels.listHiddenServerChannels,
+    token && server?._id ? { token, serverId: server._id } : "skip",
+  ) as { _id: string; name: string; type: string }[] | undefined;
+
+  const toggleHiddenChat = useMutation(api.dms.toggleHiddenChat);
+  const deleteChannel = useMutation(api.channels.remove);
+
+  const [menu, setMenu] = useState<{
+    x: number;
+    y: number;
+    channelId: string;
+    hidden: boolean;
+  } | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  const toggleHideChannel = (channelId: string, currentlyHidden: boolean) => {
+    setMenu(null);
+    void toggleHiddenChat({
+      token: token!,
+      channelId: channelId as Id<"channels">,
+      hidden: !currentlyHidden,
+    })
+      .then(() => pushToast(currentlyHidden ? "Channel unhidden" : "Channel hidden", "success"))
+      .catch((err: Error) => pushToast(err.message, "error"));
+  };
+
+  const handleDeleteChannel = async (channelId: string) => {
+    setMenu(null);
+    if (!canModerate || !server) return;
+    if (
+      !window.confirm(
+        `Delete this channel? This removes the channel and all its messages.`,
+      )
+    )
+      return;
+    setDeleting(channelId);
+    try {
+      await deleteChannel({ token: token!, channelId: channelId as Id<"channels"> });
+      pushToast("Channel deleted", "success");
+      if (activeChannelId === channelId && server._id) {
+        navigate(`/channels/${server._id}`);
+      }
+    } catch (err: Error) {
+      pushToast(err.message, "error");
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  const channelMenuItems = (channelId: string) => {
+    const items: ContextMenuItem[] = [
+      {
+        label: "Hide channel",
+        icon: <EyeOff size={14} />,
+        onClick: () => toggleHideChannel(channelId, false),
+      },
+    ];
+    if (canModerate) {
+      items.push({
+        label: "Edit channel",
+        icon: <Settings size={14} />,
+        onClick: () => {
+          setMenu(null);
+          const ch = channels?.find((c) => c._id === channelId);
+          if (ch) {
+            openModal("editChannel", {
+              channelId: ch._id,
+              channelName: ch.name,
+            });
+          }
+        },
+      });
+      items.push({
+        label: "Delete channel",
+        icon: <Trash2 size={14} />,
+        danger: true,
+        onClick: () => handleDeleteChannel(channelId),
+      });
+    } else {
+      items.push({
+        label: "Invite people",
+        icon: <Settings size={14} />,
+        onClick: () => {
+          setMenu(null);
+          openModal("invite", {
+            serverId: server?._id,
+            serverName: server?.name,
+          });
+        },
+      });
+    }
+    return items;
+  };
 
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
     try {
@@ -54,6 +156,21 @@ export function ChannelSidebar({
     if (!grouped.has(key)) grouped.set(key, []);
     grouped.get(key)!.push(channel);
   }
+
+  const hiddenRows = (hiddenChannels ?? []).map((ch) => (
+    <HiddenChannelRow
+      key={ch._id}
+      ch={ch}
+      active={activeChannelId === ch._id}
+      deletingNow={deleting === ch._id}
+      menu={menu}
+      setMenu={setMenu}
+                  toggleHideChannel={toggleHideChannel}
+                  handleDeleteChannel={handleDeleteChannel}
+                  canModerate={canModerate}
+                  server={server}
+                />
+  ));
 
   return (
     <aside className="flex w-60 shrink-0 flex-col border-r border-line bg-bg-1">
@@ -133,7 +250,16 @@ export function ChannelSidebar({
                       <motion.li
                         key={channel._id}
                         whileHover={{ backgroundColor: "var(--color-bg-2)" }}
-                        className="mb-0.5"
+                        className="mb-0.5 relative"
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          setMenu({
+                            x: e.clientX,
+                            y: e.clientY,
+                            channelId: channel._id,
+                            hidden: false,
+                          });
+                        }}
                       >
                         <div
                           className={cn(
@@ -193,7 +319,19 @@ export function ChannelSidebar({
                               <Settings size={14} />
                             </button>
                           )}
+                          <MoreHorizontal
+                            size={16}
+                            className="ml-auto shrink-0 opacity-0 group-hover:opacity-100 text-text-faint hover:text-text"
+                          />
                         </div>
+                        {menu && menu.channelId === channel._id && (
+                          <ContextMenu
+                            x={menu.x}
+                            y={menu.y}
+                            items={channelMenuItems(channel._id)}
+                            onClose={() => setMenu(null)}
+                          />
+                        )}
                       </motion.li>
                     );
                   })}
@@ -202,6 +340,30 @@ export function ChannelSidebar({
             </AnimatePresence>
           </div>
         ))}
+
+        {hiddenChannels && hiddenChannels.length > 0 && (
+          <div className="mb-2">
+            <motion.button
+              whileHover={{ backgroundColor: "var(--color-bg-2)" }}
+              onClick={() => setMenu(null)}
+              className="mb-1 flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs font-semibold tracking-wide text-text-faint uppercase transition-colors hover:text-text"
+            >
+              <Eye size={12} className="shrink-0" />
+              Hidden channels ({hiddenChannels.length})
+            </motion.button>
+            <AnimatePresence>{hiddenRows}</AnimatePresence>
+              {deleting && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 flex items-center justify-center rounded bg-black/40 backdrop-blur"
+                >
+                  <span className="text-xs text-text">Deleting…</span>
+                </motion.div>
+              )}
+            </div>
+        )}
 
         {canModerate && channels && channels.length === 0 && (
           <p className="px-2 py-4 text-xs text-text-faint">
@@ -212,6 +374,96 @@ export function ChannelSidebar({
 
       <UserPanel />
     </aside>
+  );
+}
+
+function HiddenChannelRow({
+  ch,
+  active,
+  deletingNow,
+  menu,
+  setMenu,
+  toggleHideChannel,
+  handleDeleteChannel,
+  canModerate,
+  server,
+}: {
+  ch: { _id: string; name: string; type: string };
+  active: boolean;
+  deletingNow: boolean;
+  menu: { x: number; y: number; channelId: string; hidden: boolean } | null;
+  setMenu: (v: { x: number; y: number; channelId: string; hidden: boolean } | null) => void;
+  toggleHideChannel: (channelId: string, currentlyHidden: boolean) => void;
+  handleDeleteChannel: (channelId: string) => Promise<void>;
+  canModerate: boolean;
+  server: { _id: string } | undefined;
+}) {
+  const navigate = useNavigate();
+
+  const items: ContextMenuItem[] = [
+    {
+      label: "Unhide channel",
+      icon: <Eye size={14} />,
+      onClick: () => toggleHideChannel(ch._id, true),
+    },
+  ];
+  if (canModerate) {
+    items.push({
+      label: "Delete channel",
+      icon: <Trash2 size={14} />,
+      danger: true,
+      onClick: () => handleDeleteChannel(ch._id),
+    });
+  }
+
+  return (
+    <motion.li
+      key={ch._id}
+      initial={{ opacity: 0, x: -10 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -10 }}
+      transition={{ duration: 0.15 }}
+      className="mb-1 relative"
+      onContextMenu={(e) => {
+        e.preventDefault();
+        setMenu({ x: e.clientX, y: e.clientY, channelId: ch._id, hidden: true });
+      }}
+    >
+      <motion.button
+        whileHover={{ backgroundColor: "var(--color-bg-2)" }}
+        onClick={() => {
+          setMenu(null);
+          toggleHideChannel(ch._id, true);
+          if (active && server?._id) navigate(`/channels/${server._id}`);
+        }}
+        className={cn(
+          "flex w-full items-center gap-2 rounded px-2 py-1.5 text-left transition-colors",
+          active ? "bg-bg-3 text-text" : "text-text-dim bg-bg-2/50 hover:bg-bg-3 hover:text-text",
+        )}
+      >
+        <Hash size={15} className="shrink-0 text-text-faint" />
+        <span className="truncate text-text-dim">{ch.name}</span>
+        <Eye size={14} className="shrink-0 opacity-50 text-accent" />
+      </motion.button>
+      {menu && menu.channelId === ch._id && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          items={items}
+          onClose={() => setMenu(null)}
+        />
+      )}
+      {deletingNow && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="absolute inset-0 flex items-center justify-center rounded bg-black/40 backdrop-blur"
+        >
+          <span className="text-xs text-text">Deleting…</span>
+        </motion.div>
+      )}
+    </motion.li>
   );
 }
 

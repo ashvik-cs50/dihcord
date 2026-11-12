@@ -13,6 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { MessageItem } from "./MessageItem";
 import { TypingIndicator } from "./TypingIndicator";
 import type { Member, Message, Reaction } from "@/types";
+import type { CustomEmoji } from "./content";
 
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
 
@@ -51,6 +52,27 @@ export function MessageList({
     return map;
   }, [channelReactions]);
 
+  const serverEmojis = useQuery(
+    api.emojis.listServerEmojis,
+    serverId && token ? { token, serverId } : "skip",
+  ) as { _id: string; name: string; url: string | null; animated: boolean }[] | undefined;
+
+  const userEmojis = useQuery(
+    api.users.listUserEmojis,
+    token ? { token } : "skip",
+  ) as { _id: string; name: string; url: string | null; animated: boolean }[] | undefined;
+
+  const emojiMap = useMemo<Record<string, CustomEmoji>>(() => {
+    const map: Record<string, CustomEmoji> = {};
+    for (const e of serverEmojis ?? []) {
+      map[e.name] = { name: e.name, url: e.url ?? null, animated: !!e.animated };
+    }
+    for (const e of userEmojis ?? []) {
+      map[e.name] = { name: e.name, url: e.url ?? null, animated: !!e.animated };
+    }
+    return map;
+  }, [serverEmojis, userEmojis]);
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showJump, setShowJump] = useState(false);
   const prevChannelRef = useRef(channelId);
@@ -82,10 +104,11 @@ export function MessageList({
     setShowJump(!nearBottom && messages.length > 0);
   }, [messages.length, messages[messages.length - 1]?._id]);
 
-  useEffect(() => {
+useEffect(() => {
     if (!token) return;
     void markRead({ token, channelId }).catch(() => {});
-  }, [token, channelId, messages[messages.length - 1]?._id]);
+}, [token, channelId, markRead, messages[messages.length - 1]?._id]);
+
 
   const jumpToBottom = useCallback(() => {
     const el = scrollRef.current;
@@ -145,6 +168,7 @@ export function MessageList({
               compact={compact}
               members={memberMap}
               reactions={reactionsByMessage.get(message._id) ?? []}
+              emojis={emojiMap}
               canDelete={canDeleteAny}
               onReply={onReply}
               highlight={false}

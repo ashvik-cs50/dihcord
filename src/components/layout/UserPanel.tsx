@@ -7,6 +7,7 @@ import {
   Headphones,
   HeadphoneOff,
   Settings,
+  Zap,
 } from "lucide-react";
 import { api } from "@convex/_generated/api";
 import { useAuth } from "@/contexts/AuthContext";
@@ -155,6 +156,16 @@ export function UserPanel() {
             className="w-full border-t border-line px-3 py-2 text-left text-sm text-text-dim transition-colors hover:bg-bg-3 hover:text-text"
           >
             Set custom status…
+          </button>
+          <button
+            onClick={() => {
+              setMenuOpen(false);
+              openModal("personalEmojiManager");
+            }}
+            className="w-full border-t border-line px-3 py-2 text-left text-sm text-text-dim transition-colors hover:bg-bg-3 hover:text-text"
+          >
+            <Zap size={14} className="mr-2" />
+            My emoji
           </button>
           <button
             onClick={() => {

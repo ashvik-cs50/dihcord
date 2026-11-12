@@ -9,6 +9,7 @@ import {
   USERNAME_REGEX,
   generateToken,
   SESSION_DURATION_MS,
+  randomDefaultAvatarKey,
 } from "./helpers";
 
 const hashPassword = (password: string): string => {
@@ -58,6 +59,7 @@ export const signup = action({
       username,
       displayName,
       passwordHash: hashPassword(args.password),
+      defaultAvatarKey: randomDefaultAvatarKey(),
       token,
       expiresAt: Date.now() + SESSION_DURATION_MS,
     });

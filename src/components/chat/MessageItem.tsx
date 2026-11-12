@@ -18,7 +18,7 @@ import { useUI } from "@/contexts/UIContext";
 import { Avatar } from "@/components/ui/Avatar";
 import { EnhancedEmojiPicker } from "@/components/ui/EnhancedEmojiPicker";
 import { QUICK_REACTIONS } from "@/lib/emojis";
-import { renderMessageContent } from "./content";
+import { renderMessageContent, type CustomEmoji } from "./content";
 import { cn, formatMessageTime, formatBytes } from "@/lib/utils";
 import type { Member, Message, Reaction } from "@/types";
 
@@ -27,6 +27,7 @@ export function MessageItem({
   compact,
   members,
   reactions,
+  emojis,
   canDelete,
   onReply,
   highlight,
@@ -36,6 +37,7 @@ export function MessageItem({
   compact: boolean;
   members: Map<string, Member>;
   reactions: Reaction[];
+  emojis: Record<string, CustomEmoji>;
   canDelete: boolean;
   onReply: (message: Message) => void;
   highlight: boolean;
@@ -221,6 +223,7 @@ export function MessageItem({
                       );
                       if (target) openModal("profile", { userId: target.userId });
                     },
+                    emojis,
                   )}
                   {message.editedAt && (
                     <span className="ml-1.5 text-[10px] text-text-faint">
@@ -290,7 +293,16 @@ export function MessageItem({
                       : "border-line bg-bg-2 text-text-dim hover:border-line-strong hover:text-text",
                   )}
                 >
-                  <span className="text-sm leading-none">{emoji}</span>
+                  {emojis[emoji]?.url ? (
+                    <img
+                      src={emojis[emoji].url}
+                      alt={emoji}
+                      className="h-4 w-4 rounded-sm shrink-0"
+                      draggable={false}
+                    />
+                  ) : (
+                    <span className="text-sm leading-none">{emoji}</span>
+                  )}
                   <span className="font-medium">{group.count}</span>
                 </motion.button>
               ))}

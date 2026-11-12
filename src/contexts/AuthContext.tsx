@@ -30,7 +30,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 // Safe wrappers that don't crash when ConvexProvider is not mounted
 // (e.g. during GitHub Pages deployment before VITE_CONVEX_URL is set)
-function safeUseQuery(queryFn: any, args: any) {
+function useSafeQuery(queryFn: any, args: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
   try {
     return useQuery(queryFn, args);
   } catch {
@@ -38,7 +38,7 @@ function safeUseQuery(queryFn: any, args: any) {
   }
 }
 
-function safeUseAction(actionFn: any) {
+function useSafeAction(actionFn: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
   try {
     return useAction(actionFn);
   } catch {
@@ -48,7 +48,7 @@ function safeUseAction(actionFn: any) {
   }
 }
 
-function safeUseMutation(mutationFn: any) {
+function useSafeMutation(mutationFn: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
   try {
     return useMutation(mutationFn);
   } catch {
@@ -59,32 +59,30 @@ function safeUseMutation(mutationFn: any) {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(() =>
-    localStorage.getItem(TOKEN_KEY),
-  );
+  const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_KEY));
   const [status, setStatusState] = useState<UserStatus>(
     () => (localStorage.getItem(STATUS_KEY) as UserStatus) || "online",
   );
 
-  const me = safeUseQuery(
+  const me = useSafeQuery(
     api.users.getSessionUser,
     token ? { token } : "skip",
   ) as Me | undefined | null;
 
-  const unreadNotifications = safeUseQuery(
+  const unreadNotifications = useSafeQuery(
     api.notifications.unreadCount,
     token ? { token } : "skip",
   ) as number | undefined;
 
-  const unreadChannels = safeUseQuery(
+  const unreadChannels = useSafeQuery(
     api.notifications.unreadChannelCounts,
     token ? { token } : "skip",
   ) as Record<string, number> | undefined;
 
-  const loginAction = safeUseAction(api.auth.login);
-  const signupAction = safeUseAction(api.auth.signup);
-  const logoutAction = safeUseMutation(api.users.logout);
-  const heartbeatMutation = safeUseMutation(api.users.heartbeat);
+  const loginAction = useSafeAction(api.auth.login);
+  const signupAction = useSafeAction(api.auth.signup);
+  const logoutAction = useSafeMutation(api.users.logout);
+  const heartbeatMutation = useSafeMutation(api.users.heartbeat);
 
   const loading = !!token && me === undefined;
 

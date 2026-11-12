@@ -207,6 +207,7 @@ export const createUserWithSession = internalMutation({
     username: v.string(),
     displayName: v.string(),
     passwordHash: v.string(),
+    defaultAvatarKey: v.optional(v.string()),
     token: v.string(),
     expiresAt: v.number(),
   },
@@ -214,6 +215,7 @@ export const createUserWithSession = internalMutation({
     const userId = await ctx.db.insert("users", {
       username: args.username,
       displayName: args.displayName,
+      defaultAvatarKey: args.defaultAvatarKey ?? undefined,
       status: "online",
       lastSeenAt: Date.now(),
       createdAt: Date.now(),
@@ -241,5 +243,208 @@ export const createSession = internalMutation({
       createdAt: Date.now(),
       expiresAt: args.expiresAt,
     });
+  },
+});
+
+const MAX_PERSONAL_EMOJI_SIZE = 256 * 1024;
+
+export const listUserEmojis = query({
+  args: tokenField,
+  handler: async (ctx, args) => {
+    const user = await validateTokenRead(ctx.db, args.token);
+    const emojis = await ctx.db
+      .query("userEmojis")
+      .withIndex("byUser", (q) => q.eq("userId", user._id))
+      .collect();
+    return await Promise.all(
+      emojis.map(async (e) => ({
+        _id: e._id,
+        name: e.name,
+        url: await ctx.storage.getUrl(e.imageStorageId),
+        animated: e.animated,
+        createdAt: e.createdAt,
+      })),
+    );
+  },
+});
+
+export const uploadUserEmoji = mutation({
+  args: {
+    ...tokenField,
+    name: v.string(),
+    imageStorageId: v.id("_storage"),
+    animated: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const user = await validateTokenWrite(ctx.db, args.token);
+    const name = args.name.trim().toLowerCase();
+    if (!/^[a-z0-9_]{2,32}$/.test(name)) {
+      throw new Error("Emoji name must be 2-32 chars: lowercase, numbers, underscores");
+    }
+    const existing = await ctx.db
+      .query("userEmojis")
+      .withIndex("byUserAndName", (q) =>
+        q.eq("userId", user._id).eq("name", name),
+      )
+      .unique();
+    if (existing) throw new Error("An emoji with that name already exists");
+    const metadata = await ctx.db.system.get(args.imageStorageId);
+    if (!metadata || metadata.contentType?.split("/")[0] !== "image") {
+      await ctx.storage.delete(args.imageStorageId);
+      throw new Error("Emoji must be an image");
+    }
+    if (metadata.sizeBytes && metadata.sizeBytes > MAX_PERSONAL_EMOJI_SIZE) {
+      await ctx.storage.delete(args.imageStorageId);
+      throw new Error("Emoji must be under 256 KB");
+    }
+    const animated = !!args.animated || /gif/i.test(metadata.contentType ?? "");
+    return await ctx.db.insert("userEmojis", {
+      userId: user._id,
+      name,
+      imageStorageId: args.imageStorageId,
+      animated,
+      createdAt: Date.now(),
+    });
+  },
+});
+
+export const deleteUserEmoji = mutation({
+  args: { ...tokenField, emojiId: v.id("userEmojis") },
+  handler: async (ctx, args) => {
+    const user = await validateTokenWrite(ctx.db, args.token);
+    const emoji = await ctx.db.get(args.emojiId);
+    if (!emoji || emoji.userId !== user._id) throw new Error("Emoji not found");
+    await ctx.storage.delete(emoji.imageStorageId);
+    await ctx.db.delete(args.emojiId);
+  },
+});
+
+export const generateUserEmojiUploadUrl = mutation({
+  args: tokenField,
+  handler: async (ctx, args) => {
+    await validateTokenWrite(ctx.db, args.token);
+    return await ctx.storage.generateUploadUrl();
+  },
+});
+
+export const hideChat = mutation({
+  args: { ...tokenField, channelId: v.id("channels") },
+  handler: async (ctx, args) => {
+    const user = await validateTokenWrite(ctx.db, args.token);
+    const channel = await ctx.db.get(args.channelId);
+    if (!channel) throw new Error("Channel not found");
+    const existing = await ctx.db
+      .query("hiddenChats")
+      .withIndex("byUserAndChannel", (q) =>
+        q.eq("userId", user._id).eq("channelId", args.channelId),
+      )
+      .unique();
+    if (existing) return existing._id;
+    return await ctx.db.insert("hiddenChats", {
+      userId: user._id,
+      channelId: args.channelId,
+      hiddenAt: Date.now(),
+    });
+  },
+});
+
+export const unhideChat = mutation({
+  args: { ...tokenField, channelId: v.id("channels") },
+  handler: async (ctx, args) => {
+    const user = await validateTokenWrite(ctx.db, args.token);
+    const existing = await ctx.db
+      .query("hiddenChats")
+      .withIndex("byUserAndChannel", (q) =>
+        q.eq("userId", user._id).eq("channelId", args.channelId),
+      )
+      .unique();
+    if (existing) await ctx.db.delete(existing._id);
+  },
+});
+
+export const listHiddenChats = query({
+  args: tokenField,
+  handler: async (ctx, args) => {
+    const user = await validateTokenRead(ctx.db, args.token);
+    const hidden = await ctx.db
+      .query("hiddenChats")
+      .withIndex("byUser", (q) => q.eq("userId", user._id))
+      .collect();
+    return hidden.map((h) => h.channelId);
+  },
+});
+
+export const listUserThemes = query({
+  args: tokenField,
+  handler: async (ctx, args) => {
+    const user = await validateTokenRead(ctx.db, args.token);
+    const themes = await ctx.db
+      .query("userThemes")
+      .withIndex("byUser", (q) => q.eq("userId", user._id))
+      .collect();
+    return themes.map((t) => ({
+      _id: t._id,
+      name: t.name,
+      colors: JSON.parse(t.colors),
+      createdAt: t.createdAt,
+      updatedAt: t.updatedAt,
+    }));
+  },
+});
+
+export const saveUserTheme = mutation({
+  args: {
+    ...tokenField,
+    name: v.string(),
+    colors: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await validateTokenWrite(ctx.db, args.token);
+    JSON.parse(args.colors); // validate
+    const existing = await ctx.db
+      .query("userThemes")
+      .withIndex("byUser", (q) => q.eq("userId", user._id))
+      .collect();
+    const now = Date.now();
+    const match = existing.find((t) => t.name === args.name);
+    if (match) {
+      await ctx.db.patch(match._id, {
+        colors: args.colors,
+        updatedAt: now,
+      });
+      return match._id;
+    }
+    return await ctx.db.insert("userThemes", {
+      userId: user._id,
+      name: args.name,
+      colors: args.colors,
+      createdAt: now,
+      updatedAt: now,
+    });
+  },
+});
+
+export const deleteUserTheme = mutation({
+  args: { ...tokenField, themeId: v.id("userThemes") },
+  handler: async (ctx, args) => {
+    const user = await validateTokenWrite(ctx.db, args.token);
+    const theme = await ctx.db.get(args.themeId);
+    if (!theme || theme.userId !== user._id) throw new Error("Theme not found");
+    await ctx.db.delete(args.themeId);
+  },
+});
+
+export const setUserTheme = mutation({
+  args: {
+    ...tokenField,
+    themeId: v.optional(v.string()),
+    customTheme: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await validateTokenWrite(ctx.db, args.token);
+    const patch: Record<string, string | undefined> = {};
+    if (args.themeId !== undefined) patch.themeId = args.themeId;
+    if (args.customTheme !== undefined) patch.customTheme = args.customTheme;
+    await ctx.db.patch(user._id, patch);
   },
 });

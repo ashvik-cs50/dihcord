@@ -1,18 +1,28 @@
-import { useQuery } from "convex/react";
+import { useState } from "react";
+import { useQuery, useMutation } from "convex/react";
+import type { Id } from "@convex/_generated/dataModel";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate, useParams, useLocation } from "react-router";
-import { Users, Search as SearchIcon } from "lucide-react";
+import {
+  Users,
+  Search as SearchIcon,
+  Trash2,
+  Eye,
+  EyeOff,
+  MoreHorizontal,
+} from "lucide-react";
 import { api } from "@convex/_generated/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUI } from "@/contexts/UIContext";
 import { Avatar } from "@/components/ui/Avatar";
 import { UserPanel } from "@/components/layout/UserPanel";
+import { ContextMenu } from "@/components/ui/ContextMenu";
 import { cn, formatMessageTime, isOnline } from "@/lib/utils";
 import type { DmSummary } from "@/types";
 
 export function HomeSidebar() {
   const { token, unreadChannels } = useAuth();
-  const { openModal } = useUI();
+  const { openModal, pushToast } = useUI();
   const navigate = useNavigate();
   const location = useLocation();
   const { channelId: activeChannelId } = useParams();
@@ -22,10 +32,74 @@ export function HomeSidebar() {
     token ? { token } : "skip",
   ) as DmSummary[] | undefined;
 
+  const hiddenDms = useQuery(
+    api.dms.listHiddenChats,
+    token ? { token } : "skip",
+  ) as (DmSummary & { hidden: boolean })[] | undefined;
+
+  const hideChat = useMutation(api.dms.toggleHiddenChat);
+  const deleteDm = useMutation(api.dms.deleteDm);
+
   const sorted = [...(dms ?? [])].sort(
     (a, b) =>
       (b.lastMessage?.createdAt ?? 0) - (a.lastMessage?.createdAt ?? 0),
   );
+
+  const [menu, setMenu] = useState<{
+    x: number;
+    y: number;
+    channelId: string;
+    hidden: boolean;
+  } | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  const visible = sorted.filter((dm) => !dm.hidden);
+  const hidden = (hiddenDms ?? []).filter(Boolean);
+
+  const toggleHide = (channelId: string, currentlyHidden: boolean) => {
+    setMenu(null);
+    void hideChat({
+      token: token!,
+      channelId: channelId as Id<"channels">,
+      hidden: !currentlyHidden,
+    }).then(() => {
+      pushToast(currentlyHidden ? "Chat unhidden" : "Chat hidden", "success");
+    }).catch((err: Error) => pushToast(err.message, "error"));
+  };
+
+  const handleDelete = async (channelId: string) => {
+    setMenu(null);
+    if (
+      !window.confirm(
+        "Delete this conversation? This removes the chat and its messages for you.",
+      )
+    )
+      return;
+    setDeleting(channelId);
+    try {
+      await deleteDm({ token: token!, channelId: channelId as Id<"channels"> });
+      pushToast("Conversation deleted", "success");
+      if (activeChannelId === channelId) navigate("/@me");
+    } catch (err: Error) {
+      pushToast(err.message, "error");
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  const menuItems = (channelId: string, hidden: boolean) => [
+    {
+      label: hidden ? "Unhide chat" : "Hide chat",
+      icon: hidden ? <Eye size={14} /> : <EyeOff size={14} />,
+      onClick: () => toggleHide(channelId, hidden),
+    },
+    {
+      label: "Delete conversation",
+      icon: <Trash2 size={14} />,
+      danger: true,
+      onClick: () => handleDelete(channelId),
+    },
+  ];
 
   return (
     <aside className="flex w-60 shrink-0 flex-col border-r border-line bg-bg-1">
@@ -57,10 +131,11 @@ export function HomeSidebar() {
           Direct messages
         </h3>
         <AnimatePresence>
-          {sorted.map((dm) => {
+          {visible.map((dm) => {
             const other = dm.otherUser;
             const active = activeChannelId === dm.channelId;
             const unread = dm.unread;
+            const deletingNow = deleting === dm.channelId;
             return (
               <motion.li
                 key={dm.channelId}
@@ -72,14 +147,18 @@ export function HomeSidebar() {
               >
                 <motion.button
                   whileHover={{ scale: 1.01 }}
-                  onClick={() => navigate(`/@me/${dm.channelId}`)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setMenu({ x: e.clientX, y: e.clientY, channelId: dm.channelId, hidden: false });
+                  }}
+                  ref={menuRef}
+                  onClick={() => {
+                    setMenu(null);
+                    if (other) navigate(`/@me/${dm.channelId}`);
+                  }}
                   className={cn(
-                    "flex w-full items-center gap-2 rounded px-2 py-1.5 text-left transition-colors",
-                    active
-                      ? "bg-bg-3"
-                      : unread > 0
-                        ? "text-text font-medium hover:bg-bg-2"
-                        : "text-text-dim hover:bg-bg-2 hover:text-text",
+                    "relative flex w-full items-center gap-2 rounded px-2 py-1.5 text-left transition-colors",
+                    active ? "bg-bg-3" : unread > 0 ? "text-text font-medium hover:bg-bg-2" : "text-text-dim hover:bg-bg-2 hover:text-text",
                   )}
                 >
                   {other ? (
@@ -87,6 +166,7 @@ export function HomeSidebar() {
                       name={other.displayName}
                       id={other._id}
                       url={other.avatarUrl}
+                      avatarKey={other.defaultAvatarKey}
                       size={32}
                       status={other.status}
                       lastSeenAt={other.lastSeenAt}
@@ -116,16 +196,127 @@ export function HomeSidebar() {
                       {Math.min(99, unread)}
                     </span>
                   )}
+                  <MoreHorizontal size={16} className="shrink-0 opacity-0 group-hover:opacity-100 text-text-faint hover:text-text" />
                 </motion.button>
+                {menu && menu.channelId === dm.channelId && (
+                  <ContextMenu
+                    x={menu.x}
+                    y={menu.y}
+                    items={menuItems(dm.channelId, false)}
+                    onClose={() => setMenu(null)}
+                  />
+                )}
+                {deletingNow && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute inset-0 flex items-center justify-center rounded bg-black/40 backdrop-blur"
+                  >
+                    <span className="text-xs text-text">Deleting…</span>
+                  </motion.div>
+                )}
               </motion.li>
             );
           })}
-          {sorted.length === 0 && (
+          {visible.length === 0 && (
             <li className="px-2 py-2 text-xs text-text-faint">
               No conversations yet. Add a friend and send a message.
             </li>
           )}
         </AnimatePresence>
+
+        {hidden.length > 0 && (
+          <div className="mt-3">
+            <motion.button
+              whileHover={{ backgroundColor: "var(--color-bg-2)" }}
+              onClick={() => setMenu(null)}
+              className="mb-1 flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs font-semibold tracking-wide text-text-faint uppercase transition-colors hover:text-text"
+            >
+              <Eye size={12} className="shrink-0" />
+              Hidden chats ({hidden.length})
+            </motion.button>
+            <div className="overflow-hidden transition-all duration-200">
+              <AnimatePresence>
+                {hidden.map((dm) => {
+                  const other = dm.otherUser;
+                  const deletingNow = deleting === dm.channelId;
+                  return (
+                    <motion.li
+                      key={dm.channelId}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -10 }}
+                      transition={{ duration: 0.15 }}
+                      className="mb-1"
+                    >
+                      <motion.button
+                        whileHover={{ backgroundColor: "var(--color-bg-2)" }}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          setMenu({ x: e.clientX, y: e.clientY, channelId: dm.channelId, hidden: true });
+                        }}
+                        ref={menuRef}
+                        onClick={() => {
+                          setMenu(null);
+                          if (other) navigate(`/@me/${dm.channelId}`);
+                        }}
+                        className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-text-dim bg-bg-2/50 hover:bg-bg-3 hover:text-text transition-colors"
+                      >
+                        {other ? (
+                          <Avatar
+                            name={other.displayName}
+                            id={other._id}
+                            url={other.avatarUrl}
+                            avatarKey={other.defaultAvatarKey}
+                            size={30}
+                            status={other.status}
+                            lastSeenAt={other.lastSeenAt}
+                            showPresence
+                          />
+                        ) : (
+                          <div className="h-8 w-8 rounded-full bg-bg-3" />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1">
+                            <span className="truncate text-sm text-text-dim">
+                              {other?.displayName ?? "Unknown"}
+                            </span>
+                            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-text-faint" />
+                          </div>
+                          {dm.lastMessage && (
+                            <div className="truncate text-[11px] text-text-faint">
+                              {dm.lastMessage.content || "(attachment)"}
+                            </div>
+                          )}
+                        </div>
+                        <Eye size={14} className="shrink-0 opacity-50 text-accent" />
+                      </motion.button>
+                      {menu && menu.channelId === dm.channelId && (
+                        <ContextMenu
+                          x={menu.x}
+                          y={menu.y}
+                          items={menuItems(dm.channelId, true)}
+                          onClose={() => setMenu(null)}
+                        />
+                      )}
+                      {deletingNow && (
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          className="absolute inset-0 flex items-center justify-center rounded bg-black/40 backdrop-blur"
+                        >
+                          <span className="text-xs text-text">Deleting…</span>
+                        </motion.div>
+                      )}
+                    </motion.li>
+                  );
+                })}
+              </AnimatePresence>
+            </div>
+          </div>
+        )}
       </div>
       <UserPanel />
     </aside>

@@ -361,6 +361,17 @@ select:focus-visible {
   pointer-events: none;
 }
 
+.gradient-bg {
+  background: linear-gradient(
+    135deg,
+    var(--color-accent),
+    var(--color-info),
+    var(--color-mention)
+  );
+  opacity: 0.12;
+  pointer-events: none;
+}
+
 /* --- Reduced Motion --- */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

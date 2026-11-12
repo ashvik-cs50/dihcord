@@ -21,7 +21,8 @@ export type ModalType =
   | "search"
   | "serverSettings"
   | "profileEditor"
-  | "serverEmojiManager";
+  | "serverEmojiManager"
+  | "personalEmojiManager";
 
 export type ModalPayload = {
   serverId?: Id<"servers">;

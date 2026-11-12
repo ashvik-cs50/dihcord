@@ -6,7 +6,10 @@ export default defineSchema({
     username: v.string(),
     displayName: v.string(),
     avatarStorageId: v.optional(v.id("_storage")),
+    defaultAvatarKey: v.optional(v.string()),
     accentColor: v.optional(v.string()),
+    themeId: v.optional(v.string()),
+    customTheme: v.optional(v.string()),
     status: v.union(
       v.literal("online"),
       v.literal("idle"),
@@ -171,10 +174,41 @@ export default defineSchema({
     name: v.string(),
     imageStorageId: v.id("_storage"),
     creatorId: v.id("users"),
+    animated: v.boolean(),
     createdAt: v.number(),
   })
     .index("byServer", ["serverId"])
     .index("byServerAndName", ["serverId", "name"]),
+
+  /* Personal custom emojis (owned by the user) */
+  userEmojis: defineTable({
+    userId: v.id("users"),
+    name: v.string(),
+    imageStorageId: v.id("_storage"),
+    animated: v.boolean(),
+    createdAt: v.number(),
+  })
+    .index("byUser", ["userId"])
+    .index("byUserAndName", ["userId", "name"]),
+
+  /* Per-user hidden chats (personal preference, persists across sessions) */
+  hiddenChats: defineTable({
+    userId: v.id("users"),
+    channelId: v.id("channels"),
+    hiddenAt: v.number(),
+  })
+    .index("byUser", ["userId"])
+    .index("byUserAndChannel", ["userId", "channelId"]),
+
+  /* Saved custom themes per account */
+  userThemes: defineTable({
+    userId: v.id("users"),
+    name: v.string(),
+    colors: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("byUser", ["userId"]),
 
   /* Custom stickers (free for all) */
   stickers: defineTable({

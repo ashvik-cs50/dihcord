@@ -27,6 +27,7 @@ export function ServerEmojiManager({
   const open = modal === "serverEmojiManager";
   const [emojiName, setEmojiName] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [animated, setAnimated] = useState(false);
   const [uploading, setUploading] = useState(false);
 
   if (!server) return null;
@@ -50,6 +51,7 @@ export function ServerEmojiManager({
         serverId: server._id,
         name: emojiName.trim(),
         imageStorageId: storageId.storageId,
+        animated,
       });
       pushToast("Emoji uploaded", "success");
       setEmojiName("");
@@ -105,12 +107,21 @@ export function ServerEmojiManager({
               className="max-w-xs"
               disabled={!file}
             />
+            <label className="flex items-center gap-1 rounded-md border border-line-strong bg-bg-deep px-2 py-1.5 text-xs text-text cursor-pointer hover:border-line-strong">
+              <input
+                type="checkbox"
+                checked={animated}
+                onChange={(e) => setAnimated(e.target.checked)}
+                className="accent-accent"
+              />
+              <span>Animated</span>
+            </label>
             <Button onClick={upload} disabled={!file || !emojiName.trim() || uploading} className="text-xs">
               {uploading ? "Uploading…" : "Upload"}
             </Button>
           </div>
           <p className="text-[10px] text-text-faint">
-            PNG/JPG under 256 KB. Name: 2-32 lowercase letters, numbers, underscores.
+            PNG/JPG/GIF under 256 KB. Name: 2-32 lowercase letters, numbers, underscores.
           </p>
         </div>
 

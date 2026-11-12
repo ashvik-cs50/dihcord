@@ -15,12 +15,19 @@ const normalizeName = (name: string, type: "text" | "voice") => {
 export const listByServer = query({
   args: { ...tokenField, serverId: v.id("servers") },
   handler: async (ctx, args) => {
-    await requireMember(ctx.db, args.token, args.serverId);
+    const { user } = await requireMember(ctx.db, args.token, args.serverId);
+    const hidden = await ctx.db
+      .query("hiddenChats")
+      .withIndex("byUser", (q) => q.eq("userId", user._id))
+      .collect();
+    const hiddenChannelIds = new Set(hidden.map((h) => h.channelId));
     const channels = await ctx.db
       .query("channels")
       .withIndex("byServer", (q) => q.eq("serverId", args.serverId))
       .collect();
-    return channels.sort(
+    return channels
+      .filter((c) => !hiddenChannelIds.has(c._id))
+      .sort(
       (a, b) =>
         (a.category ?? "").localeCompare(b.category ?? "") ||
         (a.position ?? 0) - (b.position ?? 0) ||
@@ -131,6 +138,25 @@ export const remove = mutation({
   },
 });
 
+export const listHiddenServerChannels = query({
+  args: { ...tokenField, serverId: v.id("servers") },
+  handler: async (ctx, args) => {
+    const { user } = await requireMember(ctx.db, args.token, args.serverId);
+    const hidden = await ctx.db
+      .query("hiddenChats")
+      .withIndex("byUser", (q) => q.eq("userId", user._id))
+      .collect();
+    const hiddenChannelIds = new Set(hidden.map((h) => h.channelId));
+    const channels = await ctx.db
+      .query("channels")
+      .withIndex("byServer", (q) => q.eq("serverId", args.serverId))
+      .collect();
+    return channels
+      .filter((c) => hiddenChannelIds.has(c._id))
+      .map((c) => ({ _id: c._id, name: c.name, type: c.type }));
+  },
+});
+
 export const cleanupChannel = async (db: MutationCtx["db"], channelId: Id<"channels">) => {
   const messages = await db
     .query("messages")
@@ -159,4 +185,9 @@ export const cleanupChannel = async (db: MutationCtx["db"], channelId: Id<"chann
     .filter((q) => q.eq(q.field("channelId"), channelId))
     .collect();
   for (const rs of readStates) await db.delete(rs._id);
+  const hidden = await db
+    .query("hiddenChats")
+    .filter((q) => q.eq(q.field("channelId"), channelId))
+    .collect();
+  for (const h of hidden) await db.delete(h._id);
 };

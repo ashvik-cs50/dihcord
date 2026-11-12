@@ -7,7 +7,10 @@ export type Me = {
   username: string;
   displayName: string;
   avatarStorageId?: Id<"_storage">;
+  defaultAvatarKey?: string;
   accentColor?: string;
+  themeId?: string;
+  customTheme?: string;
   status: UserStatus;
   customStatus?: string;
   lastSeenAt: number;
@@ -93,8 +96,11 @@ export type Member = {
   username: string;
   displayName: string;
   avatarStorageId?: Id<"_storage">;
+  defaultAvatarKey?: string;
   avatarUrl: string | null;
   accentColor?: string;
+  themeId?: string;
+  customTheme?: string;
   status: UserStatus;
   customStatus?: string;
   lastSeenAt: number;
@@ -106,7 +112,10 @@ export type FriendUser = {
   username: string;
   displayName: string;
   avatarStorageId?: Id<"_storage">;
+  defaultAvatarKey?: string;
   accentColor?: string;
+  themeId?: string;
+  customTheme?: string;
   status: UserStatus;
   customStatus?: string;
   lastSeenAt: number;
@@ -120,7 +129,10 @@ export type DmSummary = {
     username: string;
     displayName: string;
     avatarStorageId?: Id<"_storage">;
+    defaultAvatarKey?: string;
     accentColor?: string;
+    themeId?: string;
+    customTheme?: string;
     status: UserStatus;
     lastSeenAt: number;
     avatarUrl: string | null;
@@ -148,6 +160,7 @@ export type Notification = {
     username: string;
     displayName: string;
     avatarStorageId?: Id<"_storage">;
+    defaultAvatarKey?: string;
     accentColor?: string;
     avatarUrl: string | null;
   } | null;

@@ -70,12 +70,19 @@ export const listMine = query({
   args: tokenField,
   handler: async (ctx, args) => {
     const user = await validateTokenRead(ctx.db, args.token);
+    const hidden = await ctx.db
+      .query("hiddenChats")
+      .withIndex("byUser", (q) => q.eq("userId", user._id))
+      .collect();
+    const hiddenChannelIds = new Set(hidden.map((h) => h.channelId));
     const myMemberships = await ctx.db
       .query("dmMembers")
       .withIndex("byUser", (q) => q.eq("userId", user._id))
       .collect();
     return Promise.all(
-      myMemberships.map(async (m) => {
+      myMemberships
+        .filter((m) => !hiddenChannelIds.has(m.channelId))
+        .map(async (m) => {
         const channel = await ctx.db.get(m.channelId);
         if (!channel) return null;
         const members = await ctx.db
@@ -122,5 +129,120 @@ export const listMine = query({
         };
       }),
     );
+  },
+});
+
+export const listHiddenChats = query({
+  args: tokenField,
+  handler: async (ctx, args) => {
+    const user = await validateTokenRead(ctx.db, args.token);
+    const hidden = await ctx.db
+      .query("hiddenChats")
+      .withIndex("byUser", (q) => q.eq("userId", user._id))
+      .collect();
+    if (hidden.length === 0) return [];
+    const hiddenChannelIds = new Set(hidden.map((h) => h.channelId));
+    const myMemberships = await ctx.db
+      .query("dmMembers")
+      .withIndex("byUser", (q) => q.eq("userId", user._id))
+      .collect();
+    return Promise.all(
+      myMemberships
+        .filter((m) => hiddenChannelIds.has(m.channelId))
+        .map(async (m) => {
+          const channel = await ctx.db.get(m.channelId);
+          if (!channel) return null;
+          const members = await ctx.db
+            .query("dmMembers")
+            .withIndex("byChannel", (q) => q.eq("channelId", m.channelId))
+            .collect();
+          const other = members.find((x) => x.userId !== user._id);
+          const otherUser = other ? await ctx.db.get(other.userId) : null;
+          const lastMessage = await ctx.db
+            .query("messages")
+            .withIndex("byChannelCreated", (q) => q.eq("channelId", m.channelId))
+            .order("desc")
+            .first();
+          const readState = await ctx.db
+            .query("readStates")
+            .withIndex("byUserChannel", (q) =>
+              q.eq("userId", user._id).eq("channelId", m.channelId),
+            )
+            .unique();
+          return {
+            channelId: channel._id,
+            otherUser: otherUser
+              ? {
+                  _id: otherUser._id,
+                  username: otherUser.username,
+                  displayName: otherUser.displayName,
+                  avatarStorageId: otherUser.avatarStorageId,
+                  defaultAvatarKey: otherUser.defaultAvatarKey,
+                  accentColor: otherUser.accentColor,
+                  status: otherUser.status,
+                  lastSeenAt: otherUser.lastSeenAt,
+                  avatarUrl: otherUser.avatarStorageId
+                    ? await ctx.storage.getUrl(otherUser.avatarStorageId)
+                    : null,
+                }
+              : null,
+            lastMessage: lastMessage
+              ? {
+                  content: lastMessage.content,
+                  authorId: lastMessage.authorId,
+                  createdAt: lastMessage.createdAt,
+                }
+              : null,
+            unread: readState?.unread ?? 0,
+            hidden: true,
+          };
+        }),
+    );
+  },
+});
+
+export const deleteDm = mutation({
+  args: { ...tokenField, channelId: v.id("channels") },
+  handler: async (ctx, args) => {
+    await validateTokenWrite(ctx.db, args.token);
+    const { channel } = await requireChannelAccess(ctx.db, args.token, args.channelId);
+    if (channel.type !== "dm") throw new Error("Not a direct message");
+    const hidden = await ctx.db
+      .query("hiddenChats")
+      .filter((q) => q.eq(q.field("channelId"), args.channelId))
+      .collect();
+    for (const h of hidden) await ctx.db.delete(h._id);
+    await cleanupChannel(ctx.db, args.channelId);
+    await ctx.db.delete(args.channelId);
+  },
+});
+
+export const toggleHiddenChat = mutation({
+  args: { ...tokenField, channelId: v.id("channels"), hidden: v.boolean() },
+  handler: async (ctx, args) => {
+    const user = await validateTokenWrite(ctx.db, args.token);
+    const channel = await ctx.db.get(args.channelId);
+    if (!channel) throw new Error("Channel not found");
+    if (args.hidden) {
+      const existing = await ctx.db
+        .query("hiddenChats")
+        .withIndex("byUserAndChannel", (q) =>
+          q.eq("userId", user._id).eq("channelId", args.channelId),
+        )
+        .unique();
+      if (existing) return existing._id;
+      return await ctx.db.insert("hiddenChats", {
+        userId: user._id,
+        channelId: args.channelId,
+        hiddenAt: Date.now(),
+      });
+    }
+    const existing = await ctx.db
+      .query("hiddenChats")
+      .withIndex("byUserAndChannel", (q) =>
+        q.eq("userId", user._id).eq("channelId", args.channelId),
+      )
+      .unique();
+    if (existing) await ctx.db.delete(existing._id);
   },
 });

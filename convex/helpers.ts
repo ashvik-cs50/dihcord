@@ -7,7 +7,10 @@ export type SessionUser = {
   username: string;
   displayName: string;
   avatarStorageId?: Id<"_storage">;
+  defaultAvatarKey?: string;
   accentColor?: string;
+  themeId?: string;
+  customTheme?: string;
   status: Doc<"users">["status"];
   customStatus?: string;
   lastSeenAt: number;
@@ -52,7 +55,10 @@ export const publicUser = (user: Doc<"users">): SessionUser => ({
   username: user.username,
   displayName: user.displayName,
   avatarStorageId: user.avatarStorageId,
+  defaultAvatarKey: user.defaultAvatarKey,
   accentColor: user.accentColor,
+  themeId: user.themeId,
+  customTheme: user.customTheme,
   status: user.status,
   customStatus: user.customStatus,
   lastSeenAt: user.lastSeenAt,
@@ -64,6 +70,28 @@ export const MAX_MESSAGE_LENGTH = 2000;
 export const MAX_CONTENT_PREVIEW = 120;
 export const presenceWindowMs = 90_000;
 export const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
+
+/* Locally hosted default avatars — no external links, never broken */
+export const DEFAULT_AVATAR_KEYS: readonly string[] = [
+  "avatars/default-01.svg",
+  "avatars/default-02.svg",
+  "avatars/default-03.svg",
+  "avatars/default-04.svg",
+  "avatars/default-05.svg",
+  "avatars/default-06.svg",
+  "avatars/default-07.svg",
+  "avatars/default-08.svg",
+  "avatars/default-09.svg",
+  "avatars/default-10.svg",
+  "avatars/default-11.svg",
+  "avatars/default-12.svg",
+];
+
+export const randomDefaultAvatarKey = (): string => {
+  return DEFAULT_AVATAR_KEYS[
+    Math.floor(Math.random() * DEFAULT_AVATAR_KEYS.length)
+  ];
+};
 
 export const generateToken = (length = 48): string => {
   const chars =

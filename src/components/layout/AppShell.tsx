@@ -67,9 +67,19 @@ const ServerEmojiManager = lazy(() =>
     default: m.ServerEmojiManager,
   })),
 );
+const PersonalEmojiManager = lazy(() =>
+  import("@/components/modals/PersonalEmojiManager").then((m) => ({
+    default: m.PersonalEmojiManager,
+  })),
+);
 const SearchModal = lazy(() =>
   import("@/components/modals/SearchModal").then((m) => ({
     default: m.SearchModal,
+  })),
+);
+const ThemeEditor = lazy(() =>
+  import("@/components/customization/ThemeEditor").then((m) => ({
+    default: m.ThemeEditor,
   })),
 );
 
@@ -109,12 +119,14 @@ export function ModalRoot({
       {modal === "settings" && <SettingsContent />}
       {modal === "profileEditor" && <ProfileEditor />}
       {modal === "serverEmojiManager" && <ServerEmojiManager server={server} />}
+      {modal === "personalEmojiManager" && <PersonalEmojiManager />}
       {modal === "search" && (
         <SearchModal
           currentServerId={currentServerId}
           currentChannelId={currentChannelId}
         />
       )}
+      {modal === "themeEditor" && <ThemeEditor open onClose={closeModal} />}
     </Suspense>
   );
 }

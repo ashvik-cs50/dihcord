@@ -1,12 +1,21 @@
 import { Fragment, type ReactNode } from "react";
+import { CustomEmojiSpan } from "./CustomEmojiSpan";
+
+export type CustomEmoji = {
+  name: string;
+  url: string | null;
+  animated: boolean;
+};
 
 const combined = /(https?:\/\/[^\s<>()]+)|(@[a-z0-9_]{3,24})/g;
+const customEmojiRegex = /:([a-z0-9_]{2,32}):/g;
 
 export function renderMessageContent(
   content: string,
   knownUsernames: Set<string>,
   meUsername?: string,
   onMentionClick?: (username: string) => void,
+  emojis: Record<string, CustomEmoji> = {},
 ): ReactNode {
   if (!content) return null;
   const segments: ReactNode[] = [];
@@ -15,12 +24,13 @@ export function renderMessageContent(
   const regex = new RegExp(combined.source, "g");
   while ((match = regex.exec(content)) !== null) {
     if (match.index > lastIndex) {
-      segments.push(content.slice(lastIndex, match.index));
+      segments.push(...tokenize(content.slice(lastIndex, match.index), emojis));
     }
     const full = match[0];
     if (full.startsWith("http")) {
       segments.push(
         <a
+          key={`seg-${segments.length}`}
           href={full}
           target="_blank"
           rel="noreferrer noopener"
@@ -35,6 +45,7 @@ export function renderMessageContent(
         const isMe = username === meUsername;
         segments.push(
           <span
+            key={`seg-${segments.length}`}
             onClick={() => onMentionClick?.(username)}
             className="msg-mention"
             style={
@@ -47,18 +58,43 @@ export function renderMessageContent(
           </span>,
         );
       } else {
-        segments.push(full);
+        segments.push(...tokenize(full, emojis));
       }
     }
     lastIndex = match.index + full.length;
   }
   if (lastIndex < content.length) {
-    segments.push(content.slice(lastIndex));
+    segments.push(...tokenize(content.slice(lastIndex), emojis));
   }
 
   return segments.map((segment, i) => (
-    <Fragment key={i}>{withNewlines(segment)}</Fragment>
+    <Fragment key={`out-${i}`}>{withNewlines(segment)}</Fragment>
   ));
+}
+
+function tokenize(text: string, emojis: Record<string, CustomEmoji>): ReactNode[] {
+  const parts: ReactNode[] = [];
+  let last = 0;
+  let match: RegExpExecArray | null;
+  while ((match = customEmojiRegex.exec(text)) !== null) {
+    if (match.index > last) parts.push(text.slice(last, match.index));
+    const emoji = emojis[match[1]];
+    if (emoji) {
+      parts.push(
+        <CustomEmojiSpan
+          key={`emoji-${parts.length}`}
+          name={emoji.name}
+          url={emoji.url ?? null}
+          animated={emoji.animated}
+        />,
+      );
+    } else {
+      parts.push(match[0]);
+    }
+    last = match.index + match[0].length;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return parts;
 }
 
 function withNewlines(segment: ReactNode): ReactNode {
